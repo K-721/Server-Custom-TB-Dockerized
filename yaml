@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: server-psql-db
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: psql
+    ports:
+      - "15433:5432"
+    networks:
+      - tb-net
+    restart: unless-stopped
+
+  thingsboard:
+    image: openjdk:17-jdk-slim
+    container_name: server-custom-tb
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://server-psql-db:5432/thingsboard  # <- fixed name
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: psql
+    volumes:
+      - ./thingsboard/application/target:/opt/thingsboard:ro
+    working_dir: /opt/thingsboard
+    command: ["java", "-jar", "thingsboard-4.0.0-SNAPSHOT-boot.jar"]
+    networks:
+      - tb-net
+    restart: unless-stopped
+
+networks:
+  tb-net:
+    driver: bridge

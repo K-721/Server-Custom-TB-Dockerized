@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:13
+    container_name: server-psql-db
+    environment:
+      POSTGRES_DB: thingsboard
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: psql
+    ports:
+      - "15433:5432"
+    networks:
+      - tb-net
+    restart: unless-stopped
+
+  tb-init:
+    image: server-custom-tb  # reuse your custom image
+    container_name: tb-init
+    depends_on:
+      - postgres
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://server-psql-db:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: psql
+    entrypoint: ["bash", "-c", "bin/install.sh"]
+    networks:
+      - tb-net
+    restart: "no"  # runs once to initialize DB
+
+  thingsboard:
+    image: server-custom-tb
+    container_name: server-custom-tb
+    depends_on:
+      - postgres
+    privileged: true 
+    #cgroupns_mode: host
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://server-psql-db:5432/thingsboard
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: psql
+      # JAVA_OPTS: >
+      #   -Dmicrometer.metrics.export.defaults.enabled=false
+      #   -Dmanagement.metrics.export.defaults.enabled=false
+      #   -Dmanagement.metrics.enable.process=false
+      #   -Dmanagement.metrics.enable.system=false
+      JAVA_OPTS: >
+        -XX:-UseBiasedLocking
+        -Dmanagement.metrics.enabled=false
+        -Dmanagement.metrics.enable.process=false
+        -Dmanagement.metrics.enable.system=false
+        --add-opens=java.base/java.io=ALL-UNNAMED
+        --add-opens=java.base/sun.nio.ch=ALL-UNNAMED
+        --add-opens=java.base/java.util=ALL-UNNAMED
+        --add-opens=java.base/java.nio=ALL-UNNAMED
+        --add-opens=java.base/java.util.concurrent=ALL-UNNAMED
+        --add-opens=java.base/java.lang=ALL-UNNAMED
+        --add-opens=java.base/java.lang.module=ALL-UNNAMED
+        --add-opens=java.base/java.util.concurrent.atomic=ALL-UNNAMED
+
+    ports:
+      - "18082:8080"
+      - "11885:1883"
+      - "7071:7070"
+      - "5693:5683/udp"
+      - "5694:5684/udp"
+      - "5695:5685/udp"
+      - "5696:5686/udp"
+      - "5697:5687/udp"
+      - "5698:5688/udp"
+    networks:
+      - tb-net
+    restart: unless-stopped
+
+networks:
+  tb-net:
+    driver: bridge
